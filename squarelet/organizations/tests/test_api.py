@@ -11,7 +11,7 @@ from rest_framework.test import APIClient
 # Squarelet
 from squarelet.oidc.tests.factories import ClientFactory
 from squarelet.organizations.choices import ChangeLogReason, StripeAccounts
-from squarelet.organizations.models import Charge, Entitlement, Organization
+from squarelet.organizations.models import Charge, Entitlement, Organization, Plan
 from squarelet.organizations.tests.factories import (
     EntitlementFactory,
     InvitationFactory,
@@ -203,7 +203,8 @@ class TestPPInvitationAPI:
         size = 10
         InvitationFactory.create_batch(size, user=user, organization=organization)
         response = api_client.get(
-            f"/pp-api/organizations/{organization.uuid}/invitations/?expand=organization"
+            f"/pp-api/organizations/{organization.uuid}/invitations/"
+            f"?expand=organization"
         )
         assert response.status_code == status.HTTP_200_OK
         response_json = json.loads(response.content)
@@ -217,7 +218,8 @@ class TestPPInvitationAPI:
         size = 10
         InvitationFactory.create_batch(size, user=user, organization=organization)
         response = api_client.get(
-            f"/pp-api/organizations/{organization.uuid}/invitations/?expand=organization,user"
+            f"/pp-api/organizations/{organization.uuid}/invitations/"
+            f"?expand=organization,user"
         )
         assert response.status_code == status.HTTP_200_OK
         response_json = json.loads(response.content)
@@ -294,7 +296,7 @@ class TestPPPlanAPI:
         response = api_client.get(f"/pp-api/plans/")
         assert response.status_code == status.HTTP_200_OK
         response_json = json.loads(response.content)
-        assert len(response_json["results"]) == size
+        assert len(response_json["results"]) == Plan.objects.get_public().count()
         assert "id" in response_json["results"][0]
 
     def test_list_filter_by_account(self, api_client):
@@ -307,12 +309,15 @@ class TestPPPlanAPI:
             response = api_client.get(f"/pp-api/plans/", {"account": account})
             assert response.status_code == status.HTTP_200_OK
             response_json = json.loads(response.content)
-            assert len(response_json["results"]) == size
+            assert (
+                len(response_json["results"])
+                == Plan.objects.get_public().filter(stripe_account=account).count()
+            )
 
         response = api_client.get(f"/pp-api/plans/")
         assert response.status_code == status.HTTP_200_OK
         response_json = json.loads(response.content)
-        assert len(response_json["results"]) == 2 * size
+        assert len(response_json["results"]) == Plan.objects.get_public().count()
 
     def test_list_filter_by_org(self, api_client, user):
         """List plans for a given organization"""
@@ -364,7 +369,7 @@ class TestPPEntitlementAPI:
         response = api_client.get(f"/pp-api/entitlements/")
         assert response.status_code == status.HTTP_200_OK
         response_json = json.loads(response.content)
-        assert len(response_json["results"]) == size
+        assert len(response_json["results"]) == Entitlement.objects.get_public().count()
 
     def test_subscribed(self, api_client, user):
         """List entitlements for a subscribed user"""
@@ -405,7 +410,7 @@ class TestPPEntitlementAPI:
         response = api_client.get(f"/pp-api/entitlements/?expand=client")
         assert response.status_code == status.HTTP_200_OK
         response_json = json.loads(response.content)
-        assert len(response_json["results"]) == size
+        assert len(response_json["results"]) == Entitlement.objects.get_public().count()
         for entitlement in response_json["results"]:
             assert "name" in entitlement["client"]
 
