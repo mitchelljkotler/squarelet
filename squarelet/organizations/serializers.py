@@ -1,3 +1,6 @@
+# Django
+from django.db.models.expressions import F
+
 # Third Party
 import stripe
 from oidc_provider.models import Client
@@ -20,8 +23,10 @@ from squarelet.organizations.models import (
 
 class OrganizationSerializer(serializers.ModelSerializer):
     uuid = serializers.UUIDField(required=False)
-    # XXX remove plan once muckrock is updated to handle entitlements
+    # remove plan once all clients are updated to handle entitlements
     plan = serializers.SerializerMethodField()
+    # remove update_on once all clients are updated to handle entitlements
+    update_on = serializers.SerializerMethodField()
     entitlements = serializers.SerializerMethodField()
     card = serializers.SerializerMethodField()
 
@@ -38,21 +43,26 @@ class OrganizationSerializer(serializers.ModelSerializer):
             "individual",
             "private",
             "verified_journalist",
-            "update_on",
             "updated_at",
             "payment_failed",
             "avatar_url",
+            "update_on",
         )
 
     def get_plan(self, obj):
         return obj.plan.slug if obj.plan else "free"
 
+    def get_update_on(self, _obj):
+        return None
+
     def get_entitlements(self, obj):
         request = self.context.get("request")
         if request and hasattr(request, "auth") and request.auth:
-            return request.auth.client.entitlements.filter(
-                plans__organizations=obj
-            ).values_list("slug", flat=True)
+            return (
+                request.auth.client.entitlements.filter(plans__organizations=obj)
+                .annotate(update_on=F("plans__subscriptions__update_on"))
+                .values("name", "slug", "description", "resources", "update_on")
+            )
         return []
 
     def get_card(self, obj):
@@ -146,7 +156,6 @@ class PressPassOrganizationSerializer(serializers.ModelSerializer):
             "max_users",
             "individual",
             "private",
-            "update_on",
             "updated_at",
             "payment_failed",
             "avatar",
@@ -157,7 +166,6 @@ class PressPassOrganizationSerializer(serializers.ModelSerializer):
             "max_users": {"required": False},
             "individual": {"read_only": True},
             "private": {"required": False},
-            "update_on": {"read_only": True},
             "updated_at": {"read_only": True},
             "payment_failed": {"read_only": True},
             "avatar": {"required": False},

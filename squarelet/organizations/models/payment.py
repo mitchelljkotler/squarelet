@@ -1,5 +1,6 @@
 # Django
 from django.conf import settings
+from django.contrib.postgres.fields import JSONField
 from django.db import models
 from django.urls import reverse
 from django.utils.translation import ugettext_lazy as _
@@ -281,7 +282,7 @@ class Plan(models.Model):
         default=True,
         help_text=_("Is this plan usable for non-individual organizations?"),
     )
-    # XXX remove
+    # remove
     requires_updates = models.BooleanField(
         _("requires updates"),
         default=True,
@@ -493,12 +494,6 @@ class Entitlement(models.Model):
     name = models.CharField(
         _("name"), max_length=255, help_text=_("The entitlement's name")
     )
-    slug = AutoSlugField(
-        _("slug"),
-        populate_from=entitlement_slug,
-        unique=True,
-        help_text=_("A unique slug to identify the plan"),
-    )
     client = models.ForeignKey(
         verbose_name=_("client"),
         to="oidc_provider.Client",
@@ -506,15 +501,28 @@ class Entitlement(models.Model):
         related_name="entitlements",
         help_text=_("Client this entitlement grants access to"),
     )
+    slug = AutoSlugField(
+        _("slug"),
+        populate_from="name",
+        unique_with="client",
+        help_text=_("A slug to identify the plan"),
+    )
     description = models.TextField(
         _("description"),
         help_text=_("A brief description of the service this grants access to"),
+    )
+    resources = JSONField(
+        _("resources"),
+        default=dict,
+        help_text=_(
+            "Allows clients to track metadata for the resources this entitlement grants"
+        ),
     )
 
     objects = EntitlementQuerySet.as_manager()
 
     class Meta:
-        unique_together = ("name", "client")
+        unique_together = [("name", "client"), ("slug", "client")]
         ordering = ("slug",)
 
     def __str__(self):

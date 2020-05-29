@@ -97,7 +97,6 @@ class PressPassUserViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet,
 ):
-    # XXX how do we want to limit user access?
     queryset = User.objects.all()
     permission_classes = (DjangoObjectPermissions,)
     lookup_field = "uuid"
@@ -124,11 +123,23 @@ class PressPassRegisterView(RegisterView):
 
     def perform_create(self, serializer):
         data = serializer.data
+        data["source"] = "presspass"
+
         # Because the django-rest-auth serializer only supports usernames, emails,
         # and passwords, we must set the user's name to some default.
         data["name"] = ""
-        data["source"] = "presspass"
-        data["plan"] = Plan.objects.get(slug="free")
+
+        # The serializer uses write-only fields for passwords, which makes sense.
+        # This probably means we shouldn't use rest auth for registration at all.
+        # We should write our own registration view from scratch.
+        data["password1"] = self.request.data["password1"]
+
+        # Set to none until we have plans developed
+        data["plan"] = None
+
+        # Set to News Catalyst until we setup organization registration
+        data["organization_name"] = "News Catalyst"
+
         user, _group_organization, _error = get_user_model().objects.register_user(data)
         user.save()
 
