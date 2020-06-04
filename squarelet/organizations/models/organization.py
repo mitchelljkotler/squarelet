@@ -481,7 +481,9 @@ class Invitation(models.Model):
                 organization=self.organization,
                 organization_to=ORG_TO_ADMINS,
                 source=source,
-                extra_context={"joiner": self.user},
+                extra_context={
+                    "joiner": self.user,
+                },
             )
         else:
             send_mail(
@@ -489,7 +491,9 @@ class Invitation(models.Model):
                 template="organizations/email/invitation.html",
                 to=[self.email],
                 source=source,
-                extra_context={"invitation": self},
+                extra_context={
+                    "invitation": self,
+                },
             )
 
     @transaction.atomic
